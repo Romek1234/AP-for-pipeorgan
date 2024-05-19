@@ -1,0 +1,117 @@
+#include <MIDI.h>   // Add Midi Library
+
+#define CHANNEL_MAN_I 1
+#define CHANNEL_MAN_II 2
+#define LED 13    // Arduino Board LED is on Pin 13
+
+#define AutPedOn 11 // pin do włączania Automatu Ped
+
+unsigned long BAS_status_I = 0;
+unsigned long TREBL_status_I = 0;
+unsigned long BAS_status_II = 0;
+unsigned long TREBL_status_II = 0;
+
+MIDI_CREATE_DEFAULT_INSTANCE();
+
+void setup() {
+  pinMode(LED, OUTPUT);    // Set Arduino board pin 13 to output
+ 
+  pinMode(AutPedOn, INPUT_PULLUP); // set board pin ... to input
+
+  MIDI.begin(MIDI_CHANNEL_OMNI); // Initialize the Midi Library.
+  MIDI.setHandleNoteOn(MyHandleNoteOn); // This is important!!
+  MIDI.setHandleNoteOff(MyHandleNoteOff); // This command tells the Midi Library
+}
+
+void loop() {
+  MIDI.read(); // Continuously check if Midi data has been received.
+
+  if (digitalRead(AutPedOn) == HIGH) {
+    AutPed_OFF(); // Turn LED - sygnalizacja odłączenia P-I i głośnych registrów
+  }
+  
+  if (digitalRead(AutPedOn) == LOW && (TREBL_status_II != 0 || BAS_status_II != 0)) {
+    AutPed_ON(); // Turn LED - sygnalizacja odłączenia P-I i głośnych registrów
+  }
+}
+
+// Function that will be called by the Midi Library when a MIDI NOTE ON message is received.
+void MyHandleNoteOn(byte channel, byte pitch, byte velocity) {
+  if (channel == CHANNEL_MAN_I) {
+    
+    if (TREBL_status_II == 0 && BAS_status_II == 0) {
+      AutPed_OFF();  // Turn LED off
+    }
+       
+    if (pitch >= 36 && pitch <= 68) {
+      bitSet(BAS_status_I, pitch - 36);
+    }
+    
+    if (pitch >= 69 && pitch <= 101) {
+      bitSet(TREBL_status_I, pitch - 69);
+    }
+  }
+
+  if (channel == CHANNEL_MAN_II) {
+    
+
+    if (digitalRead(AutPedOn) == LOW) {
+      AutPed_ON(); // Turn LED - sygnalizacja odłączenia P-I i głośnych registrów
+    }
+
+    if (pitch >= 36 && pitch <= 68) {
+      bitSet(BAS_status_II, pitch - 36);
+    }
+    
+    if (pitch >= 69 && pitch <= 101) {
+      bitSet(TREBL_status_II, pitch - 69);
+    }
+  }
+}
+
+// Function that will be called by the Midi Library when a MIDI NOTE OFF message is received.
+void MyHandleNoteOff(byte channel, byte pitch, byte velocity) {
+  if (channel == CHANNEL_MAN_I) {
+   
+
+    
+
+    if (pitch >= 36 && pitch <= 68) {
+      bitClear(BAS_status_I, pitch - 36);
+    }
+    
+    if (pitch >= 69 && pitch <= 101) {
+      bitClear(TREBL_status_I, pitch - 69);
+    }
+
+    if (TREBL_status_II == 0 && BAS_status_II == 0) {
+      AutPed_OFF();  // Turn LED off
+    }
+  }
+
+  if (channel == CHANNEL_MAN_II) {
+    
+
+    if (pitch >= 36 && pitch <= 68) {
+      bitClear(BAS_status_II, pitch - 36);
+    }
+    
+    if (pitch >= 69 && pitch <= 101) {
+      bitClear(TREBL_status_II, pitch - 69);
+    }
+    
+    if (TREBL_status_I != 0 && BAS_status_I != 0) {
+      AutPed_OFF();  // Turn LED off
+    }
+  }
+}
+
+void AutPed_ON() {
+  digitalWrite(LED, HIGH);
+  MIDI.sendNoteOff (35, 45, 9);
+}
+
+void AutPed_OFF() {
+  digitalWrite(LED, LOW);
+  MIDI.sendNoteOn (35, 45, 9);
+}
